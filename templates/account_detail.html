@@ -94,6 +94,19 @@
                             
                             <dt class="col-sm-4">Period:</dt>
                             <dd class="col-sm-8">30 seconds</dd>
+                            
+                            <dt class="col-sm-4">Status:</dt>
+                            <dd class="col-sm-8">
+                                {% if account.hidden %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-eye-slash me-1"></i>Hidden
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-eye me-1"></i>Visible
+                                    </span>
+                                {% endif %}
+                            </dd>
                         </dl>
                     </div>
                     <div class="col-md-6">
@@ -143,6 +156,13 @@
                         <small class="text-muted">Manage this MFA account</small>
                     </div>
                     <div>
+                        <form method="POST" action="{{ url_for('toggle_hidden', account_id=account.id) }}" 
+                              style="display: inline;">
+                            <button type="submit" class="btn btn-secondary me-2">
+                                <i class="fas fa-{{ 'eye' if account.hidden else 'eye-slash' }} me-1"></i>
+                                {{ 'Show' if account.hidden else 'Hide' }} Account
+                            </button>
+                        </form>
                         <a href="{{ url_for('edit_account', account_id=account.id) }}" class="btn btn-warning me-2">
                             <i class="fas fa-edit me-1"></i>Edit Account
                         </a>

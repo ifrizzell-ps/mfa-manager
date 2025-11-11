@@ -17,7 +17,14 @@ db.init_app(app)
 @app.route('/')
 def index():
     """Main dashboard showing all MFA accounts and their current codes"""
-    accounts = MFAAccount.query.all()
+    # Check if user wants to show all accounts (including hidden)
+    show_all = request.args.get('show_all', 'false').lower() == 'true'
+    
+    if show_all:
+        accounts = MFAAccount.query.all()
+    else:
+        accounts = MFAAccount.query.filter_by(hidden=False).all()
+    
     account_data = []
     
     for account in accounts:
@@ -25,11 +32,12 @@ def index():
             'id': account.id,
             'account_name': account.account_name,
             'issuer': account.issuer,
+            'hidden': account.hidden,
             'totp_code': account.get_totp_code(),
             'remaining_time': account.get_remaining_time()
         })
     
-    return render_template('index.html', accounts=account_data, theme=session.get('theme', 'light'))
+    return render_template('index.html', accounts=account_data, show_all=show_all, theme=session.get('theme', 'light'))
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_account():
@@ -91,6 +99,7 @@ def view_account(account_id):
         'account_name': account.account_name,
         'issuer': account.issuer,
         'secret': account.secret,
+        'hidden': account.hidden,
         'totp_code': account.get_totp_code(),
         'remaining_time': account.get_remaining_time(),
         'qr_code_image': account.generate_qr_code_image(),
@@ -98,6 +107,26 @@ def view_account(account_id):
     }
     
     return render_template('account_detail.html', account=account_data, theme=session.get('theme', 'light'))
+
+@app.route('/toggle_hidden/<int:account_id>', methods=['POST'])
+def toggle_hidden(account_id):
+    """Toggle the hidden status of an MFA account"""
+    account = MFAAccount.query.get_or_404(account_id)
+    account.hidden = not account.hidden
+    status = 'hidden' if account.hidden else 'shown'
+    
+    try:
+        db.session.commit()
+        flash(f'Account "{account.account_name}" is now {status}.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating account: {str(e)}', 'error')
+    
+    # Redirect back to the page they came from, preserving show_all parameter
+    show_all = request.form.get('show_all', 'false').lower() == 'true'
+    if show_all:
+        return redirect(url_for('index', show_all='true'))
+    return redirect(url_for('index'))
 
 @app.route('/delete/<int:account_id>', methods=['POST'])
 def delete_account(account_id):
@@ -143,10 +172,14 @@ def edit_account(account_id):
                 flash('Account name already exists!', 'error')
                 return render_template('edit_account.html', account=account, theme=session.get('theme', 'light'))
         
+        # Get hidden status (checkbox returns 'on' if checked, otherwise not present)
+        hidden = request.form.get('hidden') == 'on'
+        
         # Update account
         account.account_name = new_account_name
         account.secret = new_secret.upper().replace(' ', '')
         account.issuer = new_issuer
+        account.hidden = hidden
         
         try:
             db.session.commit()
@@ -161,7 +194,14 @@ def edit_account(account_id):
 @app.route('/api/codes')
 def get_all_codes():
     """API endpoint to get all current TOTP codes (for auto-refresh)"""
-    accounts = MFAAccount.query.all()
+    # Check if user wants to show all accounts (including hidden)
+    show_all = request.args.get('show_all', 'false').lower() == 'true'
+    
+    if show_all:
+        accounts = MFAAccount.query.all()
+    else:
+        accounts = MFAAccount.query.filter_by(hidden=False).all()
+    
     codes = []
     
     for account in accounts:
@@ -246,6 +286,14 @@ if __name__ == '__main__':
     
     with app.app_context():
         db.create_all()
+        # Run migration to add hidden column if it doesn't exist
+        try:
+            from migrate_add_hidden_column import migrate
+            migrate()
+        except Exception as e:
+            # Migration will be handled automatically by SQLAlchemy if column doesn't exist
+            # This is just a safety check for existing databases
+            pass
     
     # Get configuration from environment variables
     host = get_host()

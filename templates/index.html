@@ -5,9 +5,16 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="fas fa-shield-alt me-2 text-primary"></i>MFA Dashboard</h1>
-    <a href="{{ url_for('add_account') }}" class="btn btn-success">
-        <i class="fas fa-plus me-2"></i>Add New Account
-    </a>
+    <div>
+        <a href="{{ url_for('index', show_all='true' if not show_all else 'false') }}" 
+           class="btn btn-outline-secondary me-2">
+            <i class="fas fa-{{ 'eye-slash' if show_all else 'eye' }} me-2"></i>
+            {{ 'Show Active Only' if show_all else 'Show All Accounts' }}
+        </a>
+        <a href="{{ url_for('add_account') }}" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>Add New Account
+        </a>
+    </div>
 </div>
 
 <div class="mb-4">
@@ -57,6 +64,18 @@
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
+                                    <form method="POST" 
+                                          action="{{ url_for('toggle_hidden', account_id=account.id) }}" 
+                                          style="display: inline;">
+                                        <input type="hidden" name="show_all" value="{{ 'true' if show_all else 'false' }}">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="fas fa-{{ 'eye' if account.hidden else 'eye-slash' }} me-2"></i>
+                                            {{ 'Show' if account.hidden else 'Hide' }} Account
+                                        </button>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
                                     <form method="POST" action="{{ url_for('delete_account', account_id=account.id) }}" 
                                           style="display: inline;" 
                                           onsubmit="return confirm('Are you sure you want to delete {{ account.account_name }}?')">
@@ -85,6 +104,11 @@
                         {% if account.issuer and account.issuer != 'MFA Manager' %}
                             <small class="text-muted d-block mt-2">
                                 <i class="fas fa-building me-1"></i>{{ account.issuer }}
+                            </small>
+                        {% endif %}
+                        {% if account.hidden %}
+                            <small class="text-muted d-block mt-2">
+                                <i class="fas fa-eye-slash me-1"></i>Hidden
                             </small>
                         {% endif %}
                     </div>
@@ -182,7 +206,9 @@ function performSearch(query) {
 
 // Auto-refresh TOTP codes
 function refreshCodes() {
-    fetch('/api/codes')
+    const showAll = {{ 'true' if show_all else 'false' }};
+    const url = showAll ? '/api/codes?show_all=true' : '/api/codes';
+    fetch(url)
         .then(response => response.json())
         .then(data => {
             data.forEach(account => {

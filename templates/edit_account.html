@@ -48,6 +48,17 @@
                         <div class="form-text">The organization or service name</div>
                     </div>
 
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="hidden" name="hidden" 
+                                   {% if account.hidden %}checked{% endif %}>
+                            <label class="form-check-label" for="hidden">
+                                <i class="fas fa-eye-slash me-1"></i>Hide this account
+                            </label>
+                            <div class="form-text">Hidden accounts won't appear in the dashboard by default, but can be shown by clicking "Show All Accounts"</div>
+                        </div>
+                    </div>
+
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         <strong>Important:</strong> Changing the secret key will invalidate any existing authenticator app setups. 
