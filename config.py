@@ -82,9 +82,26 @@ def get_database_path() -> str:
 def get_secret_key() -> str:
     """
     Get the secret key from environment variables with fallback.
-    
+
     Returns:
         str: Secret key for Flask application
     """
     import secrets
     return os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
+
+def get_encryption_key() -> Union[str, None]:
+    """
+    Get the encryption key from environment variables.
+    This key must be a base64-encoded 32-byte key for Fernet.
+
+    Returns:
+        str: Encryption key or None if not set
+    """
+    key = os.environ.get('ENCRYPTION_KEY')
+    if not key:
+        if is_production():
+            print("❌ Error: ENCRYPTION_KEY must be set in production environment!")
+        else:
+            print("⚠️  Warning: ENCRYPTION_KEY not set. Secrets will not be encrypted.")
+    return key

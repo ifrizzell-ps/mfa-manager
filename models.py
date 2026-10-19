@@ -1,5 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask import current_app
 from datetime import datetime, timezone
+from cryptography.fernet import Fernet
 import pyotp
 import qrcode
 import io
@@ -13,7 +15,7 @@ class MFAAccount(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     account_name = db.Column(db.String(100), nullable=False, unique=True)
-    secret = db.Column(db.String(100), nullable=False)
+    _secret = db.Column('secret', db.String(255), nullable=False)
     issuer = db.Column(db.String(100), nullable=True, default='MFA Manager')
 
     hidden = db.Column(db.Boolean, nullable=False, default=False)
@@ -25,6 +27,36 @@ class MFAAccount(db.Model):
         self.secret = secret
         if issuer:
             self.issuer = issuer
+
+    @property
+    def secret(self):
+        """Getter for secret that decrypts if ENCRYPTION_KEY is available"""
+        key = current_app.config.get('ENCRYPTION_KEY')
+        if not key or not self._secret:
+            return self._secret
+            
+        try:
+            f = Fernet(key.encode())
+            return f.decrypt(self._secret.encode()).decode()
+        except Exception:
+            # If decryption fails, it might be plain text (e.g., during migration)
+            # or the key might be wrong
+            return self._secret
+            
+    @secret.setter
+    def secret(self, value):
+        """Setter for secret that encrypts if ENCRYPTION_KEY is available"""
+        key = current_app.config.get('ENCRYPTION_KEY')
+        if not key or not value:
+            self._secret = value
+            return
+            
+        try:
+            f = Fernet(key.encode())
+            self._secret = f.encrypt(value.encode()).decode()
+        except Exception:
+            # Fallback to plain text if encryption fails
+            self._secret = value
     
     def get_totp_code(self):
         """Generate current TOTP code"""

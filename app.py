@@ -2,10 +2,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from models import db, MFAAccount
 import pyotp
 import os
-from config import get_secret_key, get_database_path
+from config import get_secret_key, get_database_path, get_encryption_key
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = get_secret_key()
+app.config['ENCRYPTION_KEY'] = get_encryption_key()
 # Use environment variable for database path in Docker, fallback to current directory
 database_path = get_database_path()
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
@@ -288,12 +289,17 @@ if __name__ == '__main__':
         db.create_all()
         # Run migration to add hidden column if it doesn't exist
         try:
-            from migrate_add_hidden_column import migrate
+            from migrations.migrate_add_hidden_column import migrate
             migrate()
         except Exception as e:
-            # Migration will be handled automatically by SQLAlchemy if column doesn't exist
-            # This is just a safety check for existing databases
             pass
+            
+        # Run migration to encrypt secrets if ENCRYPTION_KEY is set
+        try:
+            from migrations.migrate_encrypt_secrets import migrate as migrate_encryption
+            migrate_encryption()
+        except Exception as e:
+            print(f"⚠️  Error during encryption migration: {str(e)}")
     
     # Get configuration from environment variables
     host = get_host()
